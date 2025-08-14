@@ -1,0 +1,29 @@
+{
+  "name": "PJH Task Manager",
+  "short_name": "PJH Tasks",
+  "description": "Aplikasi manajemen tugas yang elegan dan dapat diinstal (PWA) untuk direktur dan staf dengan login. Menampilkan tampilan harian dan bulanan, akses offline, dan anjuran instalasi kustom. Didukung oleh Firebase untuk otentikasi dan database real-time, dan mencakup peran Super Admin untuk manajemen pengguna.",
+  "icons": [
+    {
+      "src": "pwa-192x192.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#dc2626"
+}
