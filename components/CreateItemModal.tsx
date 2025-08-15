@@ -62,13 +62,14 @@ const CreateItemModal: React.FC<CreateItemModalProps> = ({
       dueDate: new Date(dueDate + 'T23:59:59'), // Set to end of day
       status: ItemStatus.TODO,
       assigneeId,
+      createdById: currentUser.id,
     };
     
     const newItem = itemType === ItemType.PROJECT
       ? { ...newItemBase, type: ItemType.PROJECT, tasks: [] }
-      : { ...newItemBase, type: ItemType.TASK, projectId: projectId || undefined };
+      : { ...newItemBase, type: ItemType.TASK, ...(projectId ? { projectId } : {}) };
 
-    onSubmit(newItem as Omit<AppItem, 'id' | 'createdAt' | 'color'>);
+    onSubmit(newItem);
     onClose();
     resetForm();
   };

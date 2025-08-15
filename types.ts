@@ -1,5 +1,3 @@
-
-
 export enum Role {
   SUPER_ADMIN = 'Super Admin',
   DIRECTOR = 'Director',
@@ -21,6 +19,17 @@ export enum LogActionType {
   CREATE_ITEM = 'CREATE_ITEM',
   UPDATE_ITEM_STATUS = 'UPDATE_ITEM_STATUS',
   CREATE_USER = 'CREATE_USER',
+}
+
+export interface Notification {
+  id: string;
+  userId: string; // The user who receives the notification
+  triggerByUserId: string;
+  triggerByUserName: string;
+  message: string;
+  itemId: string; // ID of the related task/project
+  read: boolean;
+  createdAt: Date;
 }
 
 export interface ActivityLog {
@@ -54,6 +63,7 @@ interface BaseItem {
   title: string;
   description: string;
   createdAt: Date;
+  createdById: string;
   dueDate: Date;
   status: ItemStatus;
   type: ItemType;

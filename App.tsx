@@ -7,7 +7,7 @@ import { addMonths } from 'date-fns/addMonths';
 import { differenceInDays } from 'date-fns/differenceInDays';
 import { isBefore } from 'date-fns/isBefore';
 import { startOfDay } from 'date-fns/startOfDay';
-import type { User, AppItem, Task, ActivityLog } from './types';
+import type { User, AppItem, Task, ActivityLog, Notification } from './types';
 import { Role, ItemType, ItemStatus, LogActionType } from './types';
 import Header from './components/Header';
 import { DateView, MonthView } from './components/CalendarViews';
@@ -28,6 +28,8 @@ import firebase from 'firebase/compat/app';
 const PALETTE = ['#0891b2', '#059669', '#6d28d9', '#be185d', '#c2410c'];
 const LOGS_PER_PAGE = 20;
 
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+
 // --- APP COMPONENT ---
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -44,55 +46,20 @@ const App: React.FC = () => {
   const [isUserListModalOpen, setUserListModalOpen] = useState(false);
   const [isCreateUserModalOpen, setCreateUserModalOpen] = useState(false);
   
-  // New state for Log page
+  // Log page state
   const [activeView, setActiveView] = useState<'dashboard' | 'log'>('dashboard');
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [lastLogDoc, setLastLogDoc] = useState<firebase.firestore.DocumentSnapshot | null>(null);
   const [isLoadingMoreLogs, setIsLoadingMoreLogs] = useState(false);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [logIndexError, setLogIndexError] = useState(false);
-
-
-  // Initialize Super Admin on first load
-  useEffect(() => {
-    const initializeSuperAdmin = async () => {
-      // Use a flag in localStorage to ensure this only runs once per browser.
-      if (localStorage.getItem('super_admin_initialized_v2')) return;
   
-      const superAdminEmail = 'superadmin@test.com';
-      const superAdminPassword = 'password123';
-      
-      try {
-        // This will throw an error if the user already exists, which is what we want.
-        const userCredential = await auth.createUserWithEmailAndPassword(superAdminEmail, superAdminPassword);
-        const user = userCredential.user;
-
-        // If creation succeeds, create the corresponding Firestore document.
-        if (user) {
-            const userDocRef = db.collection('users').doc(user.uid);
-            await userDocRef.set({
-              name: 'Super Admin',
-              email: superAdminEmail,
-              role: Role.SUPER_ADMIN,
-            });
-            console.log("Super Admin account created successfully.");
-            // Immediately sign the new user out so the login screen is presented.
-            await auth.signOut();
-        }
-      } catch (error: any) {
-        if (error.code === 'auth/email-already-in-use') {
-          console.log("Super Admin account already exists in Firebase Auth.");
-        } else if (error.code !== 'auth/operation-not-allowed') { // Ignore error if email/pass auth is not enabled yet
-          console.error("Error initializing Super Admin:", error);
-        }
-      } finally {
-        // Mark as initialized to prevent re-running.
-        localStorage.setItem('super_admin_initialized_v2', 'true');
-      }
-    };
+  // Notification state
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   
-    initializeSuperAdmin();
-  }, []);
+  // Push Notification state
+  const [isPushSupported, setIsPushSupported] = useState(false);
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
   
   // Auth state listener
   useEffect(() => {
@@ -116,6 +83,8 @@ const App: React.FC = () => {
         setHasMoreLogs(true);
         setActiveView('dashboard');
         setLogIndexError(false);
+        setNotifications([]);
+        setIsPushSubscribed(false);
       }
       setAuthResolved(true);
     });
@@ -128,8 +97,6 @@ const App: React.FC = () => {
       setUsers(null);
       return;
     }
-    // All authenticated users get the full user list.
-    // UI components are already responsible for handling permissions.
     const usersCollectionRef = db.collection('users');
     const unsubscribe = usersCollectionRef.onSnapshot((snapshot) => {
       const usersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
@@ -177,7 +144,160 @@ const App: React.FC = () => {
     }
   }, [activeView, currentUser]);
 
+  // Notification listener
+  useEffect(() => {
+    if (!currentUser) {
+      setNotifications([]);
+      return;
+    }
+
+    const notificationsQuery = db.collection('notifications')
+      .where('userId', '==', currentUser.id)
+      .orderBy('createdAt', 'desc')
+      .limit(20);
+
+    const unsubscribe = notificationsQuery.onSnapshot(snapshot => {
+      const fetchedNotifications = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: (doc.data().createdAt as firebase.firestore.Timestamp).toDate(),
+      } as Notification));
+      setNotifications(fetchedNotifications);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  // Push notification setup effect
+  useEffect(() => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      setIsPushSupported(true);
+      // Check for existing subscription
+      navigator.serviceWorker.ready.then(registration => {
+        registration.pushManager.getSubscription().then(subscription => {
+          if (subscription) {
+            setIsPushSubscribed(true);
+          }
+        });
+      });
+    } else {
+      setIsPushSupported(false);
+    }
+  }, [currentUser]);
+
+
   const staffList = useMemo(() => (users || []).filter(u => u.role === Role.STAFF), [users]);
+  
+  // --- PUSH NOTIFICATION HANDLERS ---
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const handleSubscribeToPush = async () => {
+    if (!currentUser) return;
+    if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_VAPID_KEY_HERE') {
+      console.error('Kunci VAPID publik tidak dikonfigurasi. Tidak dapat berlangganan notifikasi push.');
+      alert('Konfigurasi notifikasi push tidak lengkap. Silakan hubungi administrator.');
+      return;
+    }
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+
+      // Save subscription to Firestore
+      const subscriptionRef = db.collection('pushSubscriptions').doc(currentUser.id);
+      await subscriptionRef.set(JSON.parse(JSON.stringify(subscription)));
+
+      setIsPushSubscribed(true);
+      console.log('User is subscribed to push notifications.');
+    } catch (error) {
+      console.error('Failed to subscribe the user: ', error);
+    }
+  };
+
+  // --- NOTIFICATION HANDLERS ---
+  const createNotification = async (targetUserId: string, itemId: string, message: string) => {
+    if (!currentUser || currentUser.id === targetUserId) return;
+
+    if (!targetUserId) {
+      console.warn(`Attempted to create a notification for an undefined user. This might be due to old data. ItemId: ${itemId}`);
+      return;
+    }
+
+    try {
+      await db.collection('notifications').add({
+        userId: targetUserId,
+        triggerByUserId: currentUser.id,
+        triggerByUserName: currentUser.name,
+        message,
+        itemId,
+        read: false,
+        createdAt: firestore.Timestamp.fromDate(new Date()),
+      });
+    } catch (error) {
+      console.error("Failed to create notification:", error);
+    }
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.read) {
+      db.collection('notifications').doc(notification.id).update({ read: true });
+    }
+    
+    const item = items?.find(i => i.id === notification.itemId);
+    if (item) {
+      setSelectedItem(item);
+    } else {
+      console.warn(`Item with ID ${notification.itemId} not found for notification.`);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (!currentUser) return;
+    const unreadNotifications = notifications.filter(n => !n.read);
+    if (unreadNotifications.length === 0) return;
+
+    const batch = db.batch();
+    unreadNotifications.forEach(notification => {
+      const docRef = db.collection('notifications').doc(notification.id);
+      batch.update(docRef, { read: true });
+    });
+
+    try {
+      await batch.commit();
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
+    }
+  };
+  
+  const handleClearAllRead = async () => {
+    if (!currentUser) return;
+    const readNotifications = notifications.filter(n => n.read);
+    if (readNotifications.length === 0) return;
+
+    const batch = db.batch();
+    readNotifications.forEach(notification => {
+      const docRef = db.collection('notifications').doc(notification.id);
+      batch.delete(docRef);
+    });
+
+    try {
+      await batch.commit();
+    } catch (error) {
+      console.error("Failed to clear read notifications:", error);
+    }
+  };
+
 
   // --- LOGGING ---
   const logActivity = async (action: LogActionType, details: ActivityLog['details']) => {
@@ -199,8 +319,8 @@ const App: React.FC = () => {
     if (isLoadingMoreLogs || !currentUser) return;
     
     if (!loadMore) {
-        setLogIndexError(false); // Reset error on a fresh fetch/retry.
-        setLogs([]); // Clear stale logs
+        setLogIndexError(false);
+        setLogs([]);
     }
 
     setIsLoadingMoreLogs(true);
@@ -208,7 +328,6 @@ const App: React.FC = () => {
     let query: firebase.firestore.Query = db.collection('activity_logs')
                   .orderBy('timestamp', 'desc');
 
-    // Filter logs by userId if the current user is Staff
     if (currentUser.role === Role.STAFF) {
         query = query.where('userId', '==', currentUser.id);
     }
@@ -290,6 +409,7 @@ const App: React.FC = () => {
   const handleCreateItem = async (newItemData: Omit<AppItem, 'id' | 'createdAt' | 'color'>) => {
     const commonProps = {
       createdAt: firestore.Timestamp.fromDate(new Date()),
+      createdById: currentUser.id,
       color: PALETTE[(items || []).length % PALETTE.length],
     };
     
@@ -301,13 +421,18 @@ const App: React.FC = () => {
     
     const docRef = await db.collection('items').add(dataToSave);
     
-    // If a task was created and assigned to a project, update the project's task list
     if (dataToSave.type === ItemType.TASK && dataToSave.projectId) {
         const projectRef = db.collection('items').doc(dataToSave.projectId);
         await projectRef.update({
             tasks: firestore.FieldValue.arrayUnion(docRef.id)
         });
     }
+
+    createNotification(
+      dataToSave.assigneeId,
+      docRef.id,
+      `${currentUser.name} assigned you a new ${dataToSave.type.toLowerCase()}: "${dataToSave.title}".`
+    );
 
     const assigneeName = users?.find(u => u.id === dataToSave.assigneeId)?.name || 'Unknown';
     logActivity(LogActionType.CREATE_ITEM, {
@@ -322,8 +447,21 @@ const App: React.FC = () => {
     const originalItem = items?.find(i => i.id === updatedItemData.id);
     if (!originalItem) return;
 
-    // Log status change
     if (originalItem.status !== updatedItemData.status) {
+        if (currentUser.id === originalItem.assigneeId) {
+            createNotification(
+                originalItem.createdById,
+                originalItem.id,
+                `${currentUser.name} updated the status of "${originalItem.title}" to "${updatedItemData.status}".`
+            );
+        } else {
+            createNotification(
+                originalItem.assigneeId,
+                originalItem.id,
+                `${currentUser.name} updated the status of "${originalItem.title}" to "${updatedItemData.status}".`
+            );
+        }
+
         logActivity(LogActionType.UPDATE_ITEM_STATUS, {
             itemId: originalItem.id,
             itemTitle: originalItem.title,
@@ -333,7 +471,7 @@ const App: React.FC = () => {
     }
 
     let finalUpdatedData: any = { ...updatedItemData };
-    delete finalUpdatedData.id; // Don't save id in the document body
+    delete finalUpdatedData.id;
 
     const isCompletingTask =
         finalUpdatedData.type === ItemType.TASK &&
@@ -352,13 +490,12 @@ const App: React.FC = () => {
         }
     }
     
-    // Convert Dates to Timestamps before saving
     finalUpdatedData.createdAt = firestore.Timestamp.fromDate(finalUpdatedData.createdAt);
     finalUpdatedData.dueDate = firestore.Timestamp.fromDate(finalUpdatedData.dueDate);
     if (finalUpdatedData.completedOn) {
         finalUpdatedData.completedOn = firestore.Timestamp.fromDate(finalUpdatedData.completedOn);
     } else {
-        delete finalUpdatedData.completedOn; // FIX: Prevent sending 'undefined' to Firestore
+        delete finalUpdatedData.completedOn;
     }
     
     const itemDocRef = db.collection('items').doc(updatedItemData.id);
@@ -381,7 +518,13 @@ const App: React.FC = () => {
         user={currentUser}
         onLogout={handleLogout}
         onManageUsers={() => setUserListModalOpen(true)}
-        onGoToLog={() => setActiveView('log')}
+        notifications={notifications}
+        onNotificationClick={handleNotificationClick}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onClearAllRead={handleClearAllRead}
+        isPushSupported={isPushSupported}
+        isPushSubscribed={isPushSubscribed}
+        onSubscribeToPush={handleSubscribeToPush}
       />
 
       {activeView === 'log' ? (

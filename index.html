@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PJH Task Manager</title>
+    <title>Persija Development Task Manager</title>
     
     <!-- PWA -->
     <meta name="theme-color" content="#dc2626"/>
     <link rel="manifest" href="manifest.json" />
-    <link rel="apple-touch-icon" href="/pwa-192x192.png">
+    <link rel="apple-touch-icon" href="/public/pwa-192x192.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -16,14 +16,14 @@
         theme: {
           extend: {
             colors: {
-              'brand-primary': '#dc2626', 
-              'brand-secondary': '#f97316',
-              'surface-main': '#f1f5f9', 
-              'surface-card': '#ffffff', 
-              'surface-header': '#ffffff', 
-              'text-primary': '#1e293b', 
-              'text-secondary': '#64748b', 
-              'border-main': '#e2e8f0', 
+              'brand-primary': '#dc2626', // red-600
+              'brand-secondary': '#f97316', // orange-500
+              'surface-main': '#f1f5f9', // slate-100
+              'surface-card': '#ffffff', // white
+              'surface-header': '#ffffff', // white
+              'text-primary': '#1e293b', // slate-800
+              'text-secondary': '#64748b', // slate-500
+              'border-main': '#e2e8f0', // slate-200
             },
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
@@ -67,8 +67,6 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
-    <!-- 
-      
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -80,6 +78,5 @@
         });
       }
     </script>
-    -->
   </body>
 </html>

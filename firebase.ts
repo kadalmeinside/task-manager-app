@@ -1,6 +1,7 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
+import 'firebase/compat/messaging';
 
 // Firebase configuration is now sourced from environment variables
 const firebaseConfig = {
@@ -12,7 +13,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
@@ -20,3 +20,4 @@ if (!firebase.apps.length) {
 export const auth = firebase.auth();
 export const db = firebase.firestore();
 export const firestore = firebase.firestore;
+export const messaging = firebase.messaging.isSupported() ? firebase.messaging() : null;

@@ -1,9 +1,9 @@
-const CACHE_NAME = 'zenith-task-manager-v2';
+const CACHE_NAME = 'pjh-task-manager-v2';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/pwa-192x192.png',
-  '/pwa-512x512.png',
+  '/public/pwa-192x192.png',
+  '/public/pwa-512x512.png',
   'manifest.json'
 ];
 
@@ -19,7 +19,6 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Biarkan Firebase menangani permintaan jaringannya sendiri.
   if (event.request.url.includes('firestore.googleapis.com') || event.request.url.includes('firebase')) {
     return;
   }
@@ -27,7 +26,6 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Cache hit - return response
         if (response) {
           return response;
         }
@@ -48,6 +46,36 @@ self.addEventListener('activate', event => {
           }
         })
       );
+    })
+  );
+});
+
+self.addEventListener('push', event => {
+  const data = event.data.json();
+  const options = {
+    body: data.body,
+    icon: '/public/pwa-192x192.png',
+    badge: '/public/pwa-192x192.png'
+  };
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      if (clientList.length > 0) {
+        let client = clientList[0];
+        for (let i = 0; i < clientList.length; i++) {
+          if (clientList[i].focused) {
+            client = clientList[i];
+          }
+        }
+        return client.focus();
+      }
+      return clients.openWindow('/');
     })
   );
 });
