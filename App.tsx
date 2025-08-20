@@ -30,6 +30,7 @@ const LOGS_PER_PAGE = 20;
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
+
 // --- APP COMPONENT ---
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -202,7 +203,7 @@ const App: React.FC = () => {
 
   const handleSubscribeToPush = async () => {
     if (!currentUser) return;
-    if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY === 'YOUR_PUBLIC_VAPID_KEY_HERE') {
+    if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY === 'PASTE_YOUR_PUBLIC_VAPID_KEY_HERE') {
       console.error('Kunci VAPID publik tidak dikonfigurasi. Tidak dapat berlangganan notifikasi push.');
       alert('Konfigurasi notifikasi push tidak lengkap. Silakan hubungi administrator.');
       return;

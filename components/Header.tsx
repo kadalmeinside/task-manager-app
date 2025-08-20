@@ -35,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="bg-gradient-to-r from-brand-primary to-brand-secondary text-white p-4 flex items-center justify-between sticky top-0 z-30 shadow-md">
       <div className="flex items-center gap-4">
-        <img src="/public/persija_development_logo.png" alt="Persija Development Logo" className="h-8 w-auto" />
+        <img src="/persija_development_logo.png" alt="Persija Development Logo" className="h-8 w-auto" />
       </div>
       <div className="flex items-center gap-2">
         {user.role === Role.SUPER_ADMIN && (

@@ -2,8 +2,8 @@ const CACHE_NAME = 'pjh-task-manager-v2';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/public/pwa-192x192.png',
-  '/public/pwa-512x512.png',
+  '/pwa-192x192.png',
+  '/pwa-512x512.png',
   'manifest.json'
 ];
 

@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { Notification } from '../types';
 import { formatDistanceToNow } from 'date-fns';
-import { BellIcon } from './Icons';
+import { BellIcon, XIcon } from './Icons';
 
 interface NotificationPanelProps {
   notifications: Notification[];
@@ -45,12 +45,12 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
   return (
     <div
       ref={panelRef}
-      className="absolute top-full right-0 mt-2 w-80 md:w-96 bg-surface-card rounded-lg shadow-2xl border border-border-main z-50 animate-fade-in-up"
+      className="fixed top-[72px] inset-x-4 md:absolute md:top-full md:inset-x-auto md:w-96 md:right-0 md:mt-2 bg-surface-card rounded-lg shadow-2xl border border-border-main z-50 animate-fade-in-up"
       style={{ animationDuration: '0.2s' }}
     >
       <div className="p-4 border-b border-border-main flex justify-between items-center">
         <h3 className="font-bold text-text-primary">Notifications</h3>
-        <div className="flex gap-4">
+        <div className="flex items-center gap-4">
           {unreadNotifications.length > 0 && (
             <button
               onClick={onMarkAllAsRead}
@@ -67,6 +67,13 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
               Clear Read
             </button>
           )}
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full text-text-secondary hover:bg-surface-main hover:text-text-primary transition-colors"
+            aria-label="Close"
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
         </div>
       </div>
       <div className="max-h-96 overflow-y-auto">
